@@ -4,7 +4,6 @@ import 'package:personal_area/theme/palette.dart';
 import 'package:personal_area/widgets/custom_elevated_button.dart';
 import 'package:personal_area/widgets/custom_text_field.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 
 class MainScreen extends StatefulWidget {
   MainScreen({super.key});
@@ -22,42 +21,40 @@ class _StateMainScreen extends State<MainScreen> {
       FirebaseFirestore.instance.collection('test_project_db');
   bool _isLoading = false;
 
-  void showInSnackBar(String value, { Color? color}) {
-    _scaffoldKey.currentState!.showSnackBar(
-        SnackBar(content: Center(child: Text(value)), backgroundColor: color,)
-    );
+  void showInSnackBar(String value, {Color? color}) {
+    _scaffoldKey.currentState!.showSnackBar(SnackBar(
+      content: Center(child: Text(value)),
+      backgroundColor: color,
+    ));
   }
 
   late TextEditingController surnameController;
   late TextEditingController nameController;
   late TextEditingController parentNameController;
-  late String deviceID;
   late SharedPreferences preferences;
-  final String uniqueID = 'uuid';
-
-  Future<void> _initID() async {
-    preferences = await SharedPreferences.getInstance();
-    if (preferences.containsKey(uniqueID)) {
-      deviceID = preferences.getString(uniqueID) ?? '';
-    } else {
-      const uuid = Uuid();
-      deviceID = uuid.v4();
-      preferences.setString(uniqueID, deviceID);
-    }
-  }
 
   Future<void> _getFirestoreData() async {
     setState(() {
       _isLoading = true;
     });
-    await _initID();
-    DocumentSnapshot data =
-        await testProjectDb.doc(deviceID).get();
-    if (data.exists) {
-      surnameController.text = data.get('user_surname').toString();
-      nameController.text = data.get('user_name').toString();
-      parentNameController.text = data.get('user_parent_name').toString();
+    preferences = await SharedPreferences.getInstance();
+    if (preferences.containsKey('token')) {
+      DocumentSnapshot data = await testProjectDb
+          .doc(preferences.getString('token'))
+          .get().catchError((_){
+            setState(() {
+              _isLoading = false;
+            });
+      });
+      if (data.exists) {
+        surnameController.text = data.get('user_surname').toString();
+        nameController.text = data.get('user_name').toString();
+        parentNameController.text = data.get('user_parent_name').toString();
+      }
+    } else {
+      showInSnackBar("Пользователь не зарегистрирован", color: Colors.red);
     }
+
     setState(() {
       _isLoading = false;
     });
@@ -91,7 +88,7 @@ class _StateMainScreen extends State<MainScreen> {
       _isLoading = true;
     });
     await testProjectDb
-        .doc(deviceID)
+        .doc(preferences.getString('token'))
         .set({
           "user_surname": surnameController.text,
           "user_name": nameController.text,
